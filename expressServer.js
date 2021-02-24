@@ -33,6 +33,14 @@ app.post('/userData', function(req, res){
     res.send(results);
   })
 });
+
+app.get('/designTest', function(req, res) {
+  res.render("designSample");
+})
+
+app.get('/signUp', function(req, res) {
+  res.render("signUp");
+})
  
 app.get('/user', function(req, res) {
   connection.query('SELECT * FROM fintech.user', function (error, results, fields) {
