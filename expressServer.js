@@ -2,8 +2,9 @@ const express = require('express')
 const mysql = require('mysql');
 const path = require('path');
 const request = require('request');
-const jwt = require('jsonwebtoken')
-var auth = require('./lib/auth.js')
+const jwt = require('jsonwebtoken');
+const moment = require('moment');
+var auth = require('./lib/auth.js');
 const app = express();
 
 app.use(express.json());
@@ -50,7 +51,7 @@ app.get('/authResult', function (req, res) {
   var option = {
     method: "POST",
     url: "https://testapi.openbanking.or.kr/oauth/2.0/token",
-    header: {
+    headers: {
       'Content-Type': 'application/x-www-form-urlencoded'
     },
     form: {
@@ -148,11 +149,138 @@ app.get('/authTest', auth, function(req, res){
   res.send("정상적으로 로그인 하셨다면 해당 화면이 보입니다.");
 })
 
+app.get('/main', function(req, res) {
+  res.render('main');
+})
+
+app.post('/list', auth, function(req, res){
+  var user = req.decoded;
+  
+  var sql = "SELECT * FROM user WHERE id = ?";
+  connection.query(sql, [user.userId], function(err, result){
+    if(err) throw err;
+    else {
+      var dbUserData = result[0];
+      var option = {
+        method: "GET",
+        url: "https://testapi.openbanking.or.kr/v2.0/user/me",
+        headers: {
+          Authorization: "Bearer " + dbUserData.accesstoken,
+        },
+        qs: {
+          user_seq_no: dbUserData.userseqno,
+        }
+      }
+    
+      request(option, function (err, response, body) {
+        if (err) {
+          console.log(err);
+          throw err;
+        } else {
+          var result = JSON.parse(body);
+          res.json(result);
+        }
+      })
+    }
+  })
+})
+
+app.get('/balance', function(req, res) {
+  res.render('balance');
+})
+
+app.post('/balance', auth, function(req, res) {
+  var user = req.decoded;
+  
+  var sql = "SELECT * FROM user WHERE id = ?";
+  connection.query(sql, [user.userId], function(err, result){
+    if(err) throw err;
+    else {
+      var dbUserData = result[0];
+      var finusernum = req.body.fin_use_num;
+      var countnum = Math.floor(Math.random() * 1000000000) + 1;
+      var transId = "M202111575U" + countnum;
+      var transdtime = moment(new Date()).format('YYYYMMDDhhmmss');
+
+      var option = {
+        method: "GET",
+        url: "https://testapi.openbanking.or.kr/v2.0/account/balance/fin_num",
+        headers: {
+          Authorization: "Bearer " + dbUserData.accesstoken,
+        },
+        qs: {
+          bank_tran_id: transId,
+          fintech_use_num: finusernum,
+          tran_dtime: transdtime,
+        }
+      }
+      request(option, function (err, response, body) {
+        if (err) {
+          console.log(err);
+          throw err;
+        } else {
+          var result = JSON.parse(body);
+          res.json(result);
+        }
+      })
+    }
+  })
+})
+
+app.post('/transactionList', auth, function(req, res){
+  var user = req.decoded;
+  var finusernum = req.body.fin_use_num;
+  var countnum = Math.floor(Math.random() * 1000000000) + 1;
+  var transId = "M202111575U" + countnum;
+  var transdtime = moment(new Date()).format('YYYYMMDDhhmmss');
+  console.log(transdtime);
+  var sql = "SELECT * FROM user WHERE id = ?";
+  connection.query(sql,[user.userId], function(err, result){
+      if(err) throw err;
+      else {
+          var dbUserData = result[0];
+          console.log(dbUserData);
+          var option = {
+              method : "GET",
+              url : "https://testapi.openbanking.or.kr/v2.0/account/transaction_list/fin_num",
+              headers : {
+                  Authorization : "Bearer " + dbUserData.accesstoken
+              },
+              qs : {
+                  bank_tran_id : transId,
+                  fintech_use_num : finusernum,
+                  inquiry_type : 'A',
+                  inquiry_base : 'D',
+                  from_date : '20190101',
+                  to_date : '20190101',
+                  sort_order : 'D',
+                  tran_dtime : transdtime
+              }
+          }
+          request(option, function(err, response, body){
+              if(err){
+                  console.error(err);
+                  throw err;
+              }
+              else {
+                  var transactionListResuult = JSON.parse(body);
+                  res.json(transactionListResuult)
+              }
+          })        
+      }
+  })
+})
+
+app.get('/qrcode', function(req, res){
+  res.render('qrcode');
+})
+
 app.get('/user', function (req, res) {
   connection.query('SELECT * FROM fintech.user', function (error, results, fields) {
     if (error) throw error;
     res.send(results);
   });
 })
+
 
 app.listen(3000);
